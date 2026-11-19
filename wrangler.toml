@@ -1,0 +1,12 @@
+name = "bibi-golnar-bot"
+main = "src/index.js"
+compatibility_date = "2026-11-19"
+
+# OPENROUTER_MODEL is a plain var (not a secret). All models must be :free.
+[vars]
+OPENROUTER_MODEL = "baidu/ernie-5.5-flash-preview:free"
+
+# Secrets — never commit values. Set them with:
+#   npx wrangler secret put TELEGRAM_BOT_TOKEN
+#   npx wrangler secret put OPENROUTER_API_KEY
+#   npx wrangler secret put TELEGRAM_WEBHOOK_SECRET

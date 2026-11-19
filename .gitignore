@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+.dev.vars
+.wrangler
+.vercel
+.DS_Store
+*.log
+coverage/
+.idea/
+.vscode/
