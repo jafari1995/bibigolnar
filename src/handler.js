@@ -99,7 +99,7 @@ async function handleMessage(msg, env, fetchImpl) {
     await sendChatAction(token, chatId, fetchImpl, "typing");
     let imageDataUrl = null;
     if (msg.photo) imageDataUrl = await downloadPhotoDataUrl(token, msg.photo, fetchImpl).catch(() => null);
-    const res = await smartFortune({ text: cleanText, quoted, ctx, imageDataUrl, env, fetchImpl });
+    const res = await smartFortune({ text: cleanText, quoted, quotedIsBot: Boolean(repliedToBot), ctx, imageDataUrl, env, fetchImpl });
     await sendMessage(token, { chat_id: chatId, text: clip(res.text), reply_to_message_id: msg.message_id, disable_web_page_preview: true }, fetchImpl);
     return { ok: true, type: res.type, usedLlm: Boolean(res.model), model: res.model };
   } catch (err) {

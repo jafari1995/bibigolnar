@@ -20,6 +20,7 @@ export async function narrateFortune(
   if (!key) return null;
   const models = getModels(env);
   let lastErr = null;
+  let lastInvalid = null;
   const started = Date.now();
   for (const model of models) {
     if (Date.now() - started > 14_000) break; // stay inside the Worker's waitUntil budget
@@ -29,6 +30,7 @@ export async function narrateFortune(
         fetchImpl,
       );
       if (text && (!validate || validate(text))) return { text, model };
+      if (text) lastInvalid = { text, model, invalid: true };
     } catch (err) {
       lastErr = err;
       // If the model rejected the image, retry this model once without it.
@@ -39,6 +41,7 @@ export async function narrateFortune(
             fetchImpl,
           );
           if (text && (!validate || validate(text))) return { text, model };
+      if (text) lastInvalid = { text, model, invalid: true };
         } catch (err2) {
           lastErr = err2;
         }
@@ -46,7 +49,7 @@ export async function narrateFortune(
     }
   }
   if (lastErr) console.error("OpenRouter failed:", lastErr.message || lastErr);
-  return null;
+  return lastInvalid;
 }
 
 export async function callOpenRouter(

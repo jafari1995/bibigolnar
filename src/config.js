@@ -12,7 +12,7 @@ export const DEFAULT_FALLBACK_MODELS = [
 
 export const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 export const LLM_TIMEOUT_MS = 14_000;
-export const LLM_MAX_TOKENS = 700;
+export const LLM_MAX_TOKENS = 900;
 
 export const PERSONA_NAME = "بی‌بی گلنار";
 export const BOT_USERNAME_HINT = "bibi_gonlar_bot";
