@@ -12,7 +12,7 @@ import { SYSTEM_PROMPT } from "./persona.js";
  * can fall back to canned in-character text.
  */
 export async function narrateFortune(
-  { user, imageDataUrl = null, system = SYSTEM_PROMPT },
+  { user, imageDataUrl = null, system = SYSTEM_PROMPT, validate = null },
   env,
   fetchImpl = fetch,
 ) {
@@ -20,13 +20,15 @@ export async function narrateFortune(
   if (!key) return null;
   const models = getModels(env);
   let lastErr = null;
+  const started = Date.now();
   for (const model of models) {
+    if (Date.now() - started > 14_000) break; // stay inside the Worker's waitUntil budget
     try {
       const text = await callOpenRouter(
         { model, system, user, imageDataUrl, apiKey: key },
         fetchImpl,
       );
-      if (text) return { text, model };
+      if (text && (!validate || validate(text))) return { text, model };
     } catch (err) {
       lastErr = err;
       // If the model rejected the image, retry this model once without it.
@@ -36,7 +38,7 @@ export async function narrateFortune(
             { model, system, user, imageDataUrl: null, apiKey: key },
             fetchImpl,
           );
-          if (text) return { text, model };
+          if (text && (!validate || validate(text))) return { text, model };
         } catch (err2) {
           lastErr = err2;
         }

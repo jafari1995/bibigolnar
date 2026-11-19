@@ -6,13 +6,13 @@ export const DEFAULT_MODEL = "baidu/ernie-5.5-flash-preview:free";
 
 /** Tried in order after the primary model if it fails or times out. All :free. */
 export const DEFAULT_FALLBACK_MODELS = [
-  "nvidia/nemotron-3.5-lightning:free",
-  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "dots-studio/dots-3-note-preview:free",
 ];
 
 export const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-export const LLM_TIMEOUT_MS = 9_000;
-export const LLM_MAX_TOKENS = 420;
+export const LLM_TIMEOUT_MS = 14_000;
+export const LLM_MAX_TOKENS = 700;
 
 export const PERSONA_NAME = "بی‌بی گلنار";
 export const BOT_USERNAME_HINT = "bibi_gonlar_bot";

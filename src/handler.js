@@ -12,6 +12,8 @@ import { drawCoffeeSymbols, formatSymbols } from "./coffee.js";
 import { drawYesNo, extractQuestion } from "./yesno.js";
 import { dailyFortune } from "./daily.js";
 import { narrateFortune } from "./llm.js";
+import { smartFortune } from "./smart.js";
+import { normalizeFa } from "./normalize.js";
 import {
   startText,
   helpText,
@@ -70,67 +72,41 @@ async function handleMessage(msg, env, fetchImpl) {
   const token = env.TELEGRAM_BOT_TOKEN;
   const chat = msg.chat;
   const chatId = chat.id;
-  const text = msg.text || msg.caption || "";
+  const text = (msg.text || msg.caption || "").trim();
   const privateChat = isPrivateChat(chat);
   const ctx = contextFromChat(chat, msg.from, msg);
+  const botName = (env.BOT_USERNAME || "bibi_gonlar_bot").toLowerCase();
 
-  const pendingType = msg.reply_to_message
-    ? detectPendingFromReply(msg.reply_to_message.text || msg.reply_to_message.caption || "")
-    : null;
-
-  if (pendingType) {
-    const intent = { type: pendingType, rest: text, raw: text, fromPending: true };
-    return performIntent(intent, ctx, env, fetchImpl);
-  }
-
-  const intent = detectIntent(text);
-
-  if (intent.type === "start") {
-    await reply(token, chatId, startText(), fetchImpl, { menu: true });
+  if (/^\/start\b/i.test(text) || /^\/help\b/i.test(text)) {
+    await reply(token, chatId, startText(), fetchImpl);
     return { ok: true, type: "start" };
   }
-  if (intent.type === "help") {
-    await reply(token, chatId, helpText(), fetchImpl, { menu: true });
-    return { ok: true, type: "help" };
-  }
-  if (intent.type === "menu" || intent.type === "generic") {
-    await reply(token, chatId, genericMenuText(), fetchImpl, { menu: true });
-    return { ok: true, type: "menu" };
-  }
+  if (!text && !msg.photo) return { ignored: true };
 
-  // Photo in a private chat with coffee/palm caption, or a bare photo after those words
-  if (msg.photo && !intent.type) {
-    if (privateChat) {
-      await reply(
-        token,
-        chatId,
-        "این عکس برای فال قهوه است یا کف دست، عزیزم؟ از دکمه‌ها بزن، یا زیرش بنویس قهوه / کف دست ☕✋",
-        fetchImpl,
-        { menu: true },
-      );
-      return { ok: true, type: "photo-ask" };
-    }
-    return { ignored: true };
-  }
+  const replyTo = msg.reply_to_message;
+  const repliedToBot = replyTo?.from?.is_bot && (replyTo.from.username || "").toLowerCase() === botName;
+  const mentioned = text.toLowerCase().includes("@" + botName);
+  const n = normalizeFa(text);
+  const keyword = /(فال|تاروت|حافظ|اسطرلاب|طالع|ستاره|بی ?بی|گلنار|ابجد|قهوه|نخود|کف دست)/.test(n);
 
-  if (intent.type) {
-    return performIntent(intent, ctx, env, fetchImpl);
-  }
+  if (!privateChat && !repliedToBot && !mentioned && !keyword) return { ignored: true };
 
-  if (privateChat && isGreeting(text)) {
-    await reply(token, chatId, greetingText(), fetchImpl, { menu: true });
-    return { ok: true, type: "greeting" };
-  }
+  // If replying to someone else's message, that message is the subject of the fortune.
+  const quoted = replyTo && !repliedToBot ? (replyTo.text || replyTo.caption || "") : (repliedToBot ? (replyTo.text || "").slice(0, 300) : "");
+  const cleanText = text.replace(new RegExp("@" + botName, "ig"), "").trim();
 
-  // In private chat, a bare date might be an astro follow-up even without force_reply.
-  if (privateChat && text) {
-    const reading = readingFromDate(text);
-    if (reading.ok) {
-      return performIntent({ type: "astro", rest: text, raw: text }, ctx, env, fetchImpl);
-    }
+  try {
+    await sendChatAction(token, chatId, fetchImpl, "typing");
+    let imageDataUrl = null;
+    if (msg.photo) imageDataUrl = await downloadPhotoDataUrl(token, msg.photo, fetchImpl).catch(() => null);
+    const res = await smartFortune({ text: cleanText, quoted, ctx, imageDataUrl, env, fetchImpl });
+    await sendMessage(token, { chat_id: chatId, text: clip(res.text), reply_to_message_id: msg.message_id, disable_web_page_preview: true }, fetchImpl);
+    return { ok: true, type: res.type, usedLlm: Boolean(res.model), model: res.model };
+  } catch (err) {
+    console.error("smart error:", err);
+    await reply(token, chatId, softErrorText(), fetchImpl).catch(() => null);
+    return { ok: false, error: String(err.message || err) };
   }
-
-  return { ignored: true };
 }
 
 function contextFromChat(chat, from, msg) {

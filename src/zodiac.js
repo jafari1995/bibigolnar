@@ -1,4 +1,5 @@
 import { normalizeFa, toAsciiDigits } from "./normalize.js";
+import { wordsToDigits } from "./numwords.js";
 import {
   toGregorian,
   toJalaali,
@@ -94,7 +95,7 @@ export function expandTwoDigitYear(y, preferJalali = true) {
  * @returns {{ ok: true, calendar: "jalali"|"gregorian", jy?: number, jm?: number, jd?: number, gy: number, gm: number, gd: number } | { ok: false, reason: string }}
  */
 export function parseBirthDate(text) {
-  const raw = toAsciiDigits(String(text || "")).trim();
+  const raw = wordsToDigits(normalizeFa(toAsciiDigits(String(text || "")))).trim();
   if (!raw) return { ok: false, reason: "empty" };
 
   const named = tryNamedMonth(raw);
@@ -130,7 +131,13 @@ function tryNamedMonth(raw) {
   }
   if (!month) return { ok: false };
   const nums = n.match(/(\d{1,4})/g)?.map((s) => Number(s)) || [];
-  if (nums.length < 2) return { ok: false, reason: "need-day-year" };
+  if (nums.length < 1) return { ok: false, reason: "need-day" };
+  if (nums.length === 1) {
+    // Day + month only (e.g. «پونزده تیر»): the sign doesn't need a year.
+    const day = nums[0];
+    const isJ = JALALI_MONTHS.some((nm) => normalizeFa(nm) === monthName);
+    return { ok: true, calendarHint: isJ ? "jalali" : "gregorian", y: isJ ? 1370 : 1991, m: month, d: day, noYear: true };
+  }
   // day and year: usually "15 تیر 1370" or "تیر 15 1370" or "15 1370 تیر"
   let day;
   let year;
@@ -191,11 +198,11 @@ function finalize(parts) {
   if (calendar === "jalali") {
     if (!isValidJalaaliDate(y, m, d)) return { ok: false, reason: "invalid-jalali" };
     const g = toGregorian(y, m, d);
-    return { ok: true, calendar: "jalali", jy: y, jm: m, jd: d, gy: g.gy, gm: g.gm, gd: g.gd };
+    return { ok: true, calendar: "jalali", jy: y, jm: m, jd: d, gy: g.gy, gm: g.gm, gd: g.gd, noYear: !!parts.noYear };
   }
   if (!isValidGregorianDate(y, m, d)) return { ok: false, reason: "invalid-gregorian" };
   const j = toJalaali(y, m, d);
-  return { ok: true, calendar: "gregorian", jy: j.jy, jm: j.jm, jd: j.jd, gy: y, gm: m, gd: d };
+  return { ok: true, calendar: "gregorian", jy: j.jy, jm: j.jm, jd: j.jd, gy: y, gm: m, gd: d, noYear: !!parts.noYear };
 }
 
 export function formatBirth(parsed) {
@@ -213,8 +220,8 @@ export function readingFromDate(text) {
     parsed,
     sign,
     summary: {
-      jalali: `${parsed.jd} ${JALALI_MONTHS[parsed.jm - 1]} ${parsed.jy}`,
-      gregorian: `${parsed.gy}-${String(parsed.gm).padStart(2, "0")}-${String(parsed.gd).padStart(2, "0")}`,
+      jalali: parsed.noYear ? `${parsed.jd} ${JALALI_MONTHS[parsed.jm - 1]}` : `${parsed.jd} ${JALALI_MONTHS[parsed.jm - 1]} ${parsed.jy}`,
+      gregorian: parsed.noYear ? `${String(parsed.gm).padStart(2, "0")}-${String(parsed.gd).padStart(2, "0")}` : `${parsed.gy}-${String(parsed.gm).padStart(2, "0")}-${String(parsed.gd).padStart(2, "0")}`,
       signFa: sign.fa,
       signEn: sign.en,
     },
